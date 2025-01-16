@@ -9,58 +9,100 @@ from mmdet.models import weight_reduce_loss
 
 from mmrotate.registry import MODELS
 
-
-def smooth_focal_loss(pred,
-                      target,
-                      weight=None,
-                      gamma=2.0,
-                      alpha=0.25,
-                      reduction='mean',
-                      avg_factor=None):
-    """Smooth Focal Loss proposed in Circular Smooth Label (CSL).
+def sigmoid_focal_loss(inputs, targets, num_boxes, alpha: float = 0.25, gamma: float = 2):
+    """
+    Loss used in RetinaNet for dense detection: https://arxiv.org/abs/1708.02002.
 
     Args:
-        pred (torch.Tensor): The prediction.
-        target (torch.Tensor): The learning label of the prediction.
-        weight (torch.Tensor, optional): The weight of loss for each
-            prediction. Defaults to None.
-        gamma (float, optional): The gamma for calculating the modulating
-                factor. Defaults to 2.0.
-        alpha (float, optional): A balanced form for Focal Loss.
-            Defaults to 0.25.
-        reduction (str, optional): The reduction method used to
-            override the original reduction method of the loss.
-            Options are "none", "mean" and "sum".
-        avg_factor (int, optional): Average factor that is used to average
-            the loss. Defaults to None.
+        inputs (torch.Tensor): A float tensor of arbitrary shape.
+            The predictions for each example.
+        targets (torch.Tensor): A float tensor with the same shape as inputs. Stores the binary
+            classification label for each element in inputs
+            (0 for the negative class and 1 for the positive class).
+        num_boxes (int): The number of boxes.
+        alpha (float, optional): Weighting factor in range (0, 1) to balance
+            positive vs negative examples. Default: 0.25.
+        gamma (float): Exponent of the modulating factor (1 - p_t) to
+            balance easy vs hard examples. Default: 2.
 
     Returns:
-        torch.Tensor: The calculated loss
+        torch.Tensor: The computed sigmoid focal loss.
     """
+    prob = inputs.sigmoid()
+    ce_loss = F.binary_cross_entropy_with_logits(inputs, targets, reduction="none")
+    p_t = prob * targets + (1 - prob) * (1 - targets)
+    loss = ce_loss * ((1 - p_t) ** gamma)
 
-    pred_sigmoid = pred.sigmoid()
-    target = target.type_as(pred)
-    pt = (1 - pred_sigmoid) * target + pred_sigmoid * (1 - target)
-    focal_weight = (alpha * target + (1 - alpha) *
-                    (1 - target)) * pt.pow(gamma)
-    loss = F.binary_cross_entropy_with_logits(
-        pred, target, reduction='none') * focal_weight
-    if weight is not None:
-        if weight.shape != loss.shape:
-            if weight.size(0) == loss.size(0):
-                # For most cases, weight is of shape (num_priors, ),
-                #  which means it does not have the second axis num_class
-                weight = weight.view(-1, 1)
-            else:
-                # Sometimes, weight per anchor per class is also needed. e.g.
-                #  in FSAF. But it may be flattened of shape
-                #  (num_priors x num_class, ), while loss is still of shape
-                #  (num_priors, num_class).
-                assert weight.numel() == loss.numel()
-                weight = weight.view(loss.size(0), -1)
-        assert weight.ndim == loss.ndim
-    loss = weight_reduce_loss(loss, weight, reduction, avg_factor)
-    return loss
+    if alpha >= 0:
+        alpha_t = alpha * targets + (1 - alpha) * (1 - targets)
+        loss = alpha_t * loss
+
+    return loss.mean(1).sum() / num_boxes
+def binary_cross_entropy_loss_with_logits(inputs, pos_weights, neg_weights, avg_factor):
+    p = inputs.sigmoid()
+    loss = -pos_weights * p.log() - neg_weights * (1-p).log() 
+    return loss.sum()/avg_factor
+
+
+
+def get_local_rank( quality, indices):
+    #quality: one-dimension tensor 
+    #indices: matching result
+    bs = len(indices)
+    device = quality.device
+    tgt_size = [len(tgt_ind) for _,tgt_ind in indices]
+    ind_start = 0
+    rank_list = []
+    for i in range(bs):
+        if  tgt_size[i] == 0:
+            rank_list.append(torch.zeros(0,dtype=torch.long,device=device))
+            continue     
+        num_tgt = max(indices[i][1]) + 1
+        # split quality of one item
+        quality_per_img = quality[ind_start:ind_start+tgt_size[i]]
+        ind_start += tgt_size[i]
+        #suppose candidate bag sizes are equal        
+        k = torch.div(tgt_size[i], num_tgt,rounding_mode='floor')
+        #sort quality in each candidate bag
+        quality_per_img = quality_per_img.reshape(num_tgt, k)
+        ind = quality_per_img.sort(dim=-1,descending=True)[1]
+        #scatter ranks, eg:[0.3,0.6,0.5] -> [2,0,1]
+        rank_per_img = torch.zeros_like(quality_per_img, dtype=torch.long, device = device)
+        rank_per_img.scatter_(-1, ind, torch.arange(k,device=device, dtype=torch.long).repeat(num_tgt,1))
+        rank_list.append(rank_per_img.flatten())
+
+    return torch.cat(rank_list, 0)
+
+def KL_BCE_loss(src_logits,pos_idx_c, src_boxes, target_boxes, indices, avg_factor, alpha,gamma, w_prime=1, ):
+    prob = src_logits.sigmoid()
+    #init positive weights and negative weights
+    pos_weights = torch.zeros_like(src_logits)
+    neg_weights =  prob ** gamma
+    #ious_scores between matched boxes and GT boxes
+    # iou_scores = torch.diag(box_iou(box_cxcywh_to_xyxy(src_boxes), box_cxcywh_to_xyxy( target_boxes))[0])
+
+    gious = bbox_overlaps(box_iou(box_cxcywh_to_xyxy(src_boxes), box_cxcywh_to_xyxy(target_boxes)), mode='giou', is_aligned=True)
+
+
+    # t is the quality metric
+    # Control t through GIoU score
+    t = torch.where(gious > 0, (prob[pos_idx_c] ** self.alpha * gious ** (1 - self.alpha)),
+                    (prob[pos_idx_c]))
+
+    t = torch.clamp(t, 0.01).detach()
+    rank = get_local_rank(t, indices)
+    #define positive weights for SoftBceLoss  
+    if type(w_prime) != int:
+        rank_weight = w_prime[rank]
+    else:
+        rank_weight = w_prime
+    
+    t = t * rank_weight
+    pos_weights[pos_idx_c] = t 
+    neg_weights[pos_idx_c] = (1 -t)    
+    
+    loss = -pos_weights * prob.log() - neg_weights * (1-prob).log() 
+    return loss.sum()/avg_factor, rank_weight
 
 
 @MODELS.register_module()
