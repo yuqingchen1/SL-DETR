@@ -20,7 +20,7 @@ Propose dynamic adjustment of classification weights to better associate classif
 Changes made in LG-DETR/lgdetr/losses/losses.py (lines 97-100)
 
 Introduce L1 distance and control GIOU loss through function
-Modifications made in LG-DETR/lgdetr/losses/losses.py (lines 147-157)
+Modifications made in LG-DETR/mmdet/models/losses/new_iou_loss.py (lines 147-157)
 
 Rotated  object detection Example:
 Our code is in SL-DETR ([README.md](SL-DETR%2FREADME.md))
