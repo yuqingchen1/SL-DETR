@@ -94,9 +94,8 @@ def GA_BCE_loss(src_logits,pos_idx_c, src_boxes, target_boxes, indices, avg_fact
     gious = bbox_overlaps(box_iou(box_cxcywh_to_xyxy(src_boxes), box_cxcywh_to_xyxy(target_boxes)), mode='giou', is_aligned=True)
 
 
-    #t is the quality metric
-    # t = prob[pos_idx_c]**alpha * iou_scores ** (1-alpha)
-
+    # t is the quality metric
+    # Control t through GIoU score
     t = torch.where(gious > 0, (prob[pos_idx_c] ** self.alpha * gious ** (1 - self.alpha)),
                     (prob[pos_idx_c]))
 
