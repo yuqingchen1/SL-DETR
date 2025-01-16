@@ -6,6 +6,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 from mmdet.models import weight_reduce_loss
+from mmdet.models.losses.new_gaussian_loss import weighted_loss
 
 from mmrotate.registry import MODELS
 
