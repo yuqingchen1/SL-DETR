@@ -6,7 +6,7 @@
 import torch.nn as nn
 import torch.nn.functional as F
 from mmdet.models import weight_reduce_loss
-from mmdet.models.losses.new_gaussian_loss import weighted_loss
+from mmdet.models.losses.new_gaussian_loss import new_kld_loss
 
 from mmrotate.registry import MODELS
 
@@ -79,16 +79,10 @@ def KL_BCE_loss(src_logits,pos_idx_c, src_boxes, target_boxes, indices, avg_fact
     #init positive weights and negative weights
     pos_weights = torch.zeros_like(src_logits)
     neg_weights =  prob ** gamma
-    #ious_scores between matched boxes and GT boxes
-    # iou_scores = torch.diag(box_iou(box_cxcywh_to_xyxy(src_boxes), box_cxcywh_to_xyxy( target_boxes))[0])
-
-    gious = bbox_overlaps(box_iou(box_cxcywh_to_xyxy(src_boxes), box_cxcywh_to_xyxy(target_boxes)), mode='giou', is_aligned=True)
-
 
     # t is the quality metric
-    # Control t through GIoU score
-    t = torch.where(gious > 0, (prob[pos_idx_c] ** self.alpha * gious ** (1 - self.alpha)),
-                    (prob[pos_idx_c]))
+    # Control t through KL 
+    t = prob[pos_idx_c] ** self.alpha * new_kld_loss ** (1 - self.alpha)
 
     t = torch.clamp(t, 0.01).detach()
     rank = get_local_rank(t, indices)
