@@ -28,6 +28,10 @@ Our code is in SL-DETR ([README.md](SL-DETR%2FREADME.md))
 Introduce L1 distance and control kl distances loss through function.
 Modifications made in (sl-DETR/mmrotate/models/losses/new_gaussian_loss.py (lines 207-212))
 
+Propose dynamic adjustment of classification weights to better associate classification and localization losses.
+Modifications made in (sl-DETR/mmrotate/models/losses/smooth_focal_loss.py (lines 85-))
+
+
 ## Citation
 
 If you are interested in our work and use our method in your research, please cite
