@@ -204,8 +204,9 @@ def new_kld_loss(pred, target,
 
     distance1 = distance.reshape(_shape[:-1])
 
+#Introduce L1 distance and control kl distance loss through function.
     normalized_tensor = (distance1 - distance1.min()) / (distance1.max() - distance1.min())
-    l1 = (torch.abs(pred1 - target1)**2).sum(1)/4
+    l1 = (torch.abs(pred1 - target1)).sum(1)/4
     t = ((2 * l1) / (normalized_tensor + l1)).clamp(0.8, 1.1)
     T = torch.exp(1.5*(t-1))
     distance = distance1 * T
