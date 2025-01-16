@@ -82,6 +82,7 @@ def KL_BCE_loss(src_logits,pos_idx_c, src_boxes, target_boxes, indices, avg_fact
 
     # t is the quality metric
     # Control t through KL 
+    new_kld_loss = torch.clamp(new_kld_loss, 0, 1)
     t = prob[pos_idx_c] ** self.alpha * new_kld_loss ** (1 - self.alpha)
 
     t = torch.clamp(t, 0.01).detach()
