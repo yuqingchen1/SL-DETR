@@ -29,7 +29,7 @@ Introduce L1 distance and control kl distances loss through function.
 Modifications made in (sl-DETR/mmrotate/models/losses/new_gaussian_loss.py (lines 207-212))
 
 Propose dynamic adjustment of classification weights to better associate classification and localization losses.
-Modifications made in (sl-DETR/mmrotate/models/losses/smooth_focal_loss.py (lines 85-))
+Modifications made in (sl-DETR/mmrotate/models/losses/smooth_focal_loss.py (lines 83-86))
 
 
 ## Citation
