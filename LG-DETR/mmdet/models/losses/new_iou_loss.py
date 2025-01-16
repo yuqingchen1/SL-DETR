@@ -145,6 +145,7 @@ def giou_loss(bbox_preds, bbox_targets, pred: Tensor, target: Tensor, eps: float
         gious = gious.to(torch.float16)
 
     ####################################################################
+  # Introduce L1 distance and control GIOU loss through function
     iou = gious.clamp(0.001, 1)
     l2_1 = torch.abs(bbox_preds - bbox_targets)**2
     l2_ = -(l2_1.sum(1)/4) + 1
