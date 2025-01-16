@@ -25,6 +25,8 @@ Modifications made in LG-DETR/mmdet/models/losses/new_iou_loss.py (lines 147-157
 Rotated  object detection Example:
 Our code is in SL-DETR ([README.md](SL-DETR%2FREADME.md))
 
+Introduce L1 distance and control kl distances loss through function
+Modifications made in LG-DETR/mmdet/models/losses/new_iou_loss.py (lines 207-212)
 
 ## Citation
 
