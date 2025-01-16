@@ -16,6 +16,12 @@ in improving the overall optimization and detection accuracy of DETR-based model
 Oriented object detection Example:
 Our code is in LG-DETR ([README.md](LG-DETR%2FLGDETR%2FREADME.md))
 
+Propose dynamic adjustment of classification weights to better associate classification and localization losses
+Changes made in LG-DETR/lgdetr/losses/losses.py (lines 97-100)
+
+Introduce L1 distance and control GIOU loss through function
+Modifications made in LG-DETR/lgdetr/losses/losses.py (lines 147-157)
+
 Rotated  object detection Example:
 Our code is in SL-DETR ([README.md](SL-DETR%2FREADME.md))
 
